@@ -8,7 +8,6 @@ import {
   ChevronRight,
   Coffee,
   Hotel,
-  LockKeyhole,
   Menu,
   MessageCircle,
   Minus,
@@ -168,9 +167,6 @@ export function PublicSite() {
             ))}
           </nav>
           <div className="header-actions">
-            <a href="/admin/login" className="icon-button admin-link" aria-label="Admin login">
-              <LockKeyhole size={16} />
-            </a>
             <a className="phone-pill" href={`tel:+91${phone}`}>
               <Phone size={15} />
               <span>{phone}</span>

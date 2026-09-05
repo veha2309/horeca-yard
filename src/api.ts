@@ -6,22 +6,37 @@ export type User = {
   role: 'Owner' | 'Sales' | 'Warehouse';
 };
 export async function api<T = any>(url: string, options: RequestInit = {}): Promise<T> {
-  const result = await fetch(url, {
-    ...options,
-    headers: {
-      ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
-      ...options.headers,
-    },
-  });
-  if (!result.ok) {
-    let message = 'Request failed. Please try again.';
-    try {
-      const body = await result.json();
-      message = body.error || message;
-    } catch {}
-    throw Object.assign(new Error(message), { status: result.status });
+  const { handle } = await import('./core/routes.js');
+  const [path, search] = url.split('?');
+  const body =
+    options.body instanceof FormData
+      ? options.body
+      : typeof options.body === 'string'
+        ? JSON.parse(options.body)
+        : undefined;
+  try {
+    return (await handle(path, {
+      method: options.method || 'GET',
+      body,
+      headers: (options.headers as Record<string, string>) || {},
+      query: new URLSearchParams(search || ''),
+    })) as T;
+  } catch (e: any) {
+    throw Object.assign(new Error(e?.message || 'Request failed. Please try again.'), {
+      status: e?.status ?? 500,
+    });
   }
-  return result.json();
+}
+/** Saves a generated Blob to the user's device, replacing a download URL. */
+export function download(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 export const mutate = (path: string, data: any, method = 'POST', key = crypto.randomUUID()) =>
   api(path, { method, body: JSON.stringify(data), headers: { 'Idempotency-Key': key } });

@@ -33,7 +33,16 @@ import {
   AlertTriangle,
   Leaf,
 } from 'lucide-react';
-import { api, mutate, money, dateLabel, today, type RecordData, type User } from './api.js';
+import { api, mutate, money, dateLabel, today, download, type RecordData, type User } from './api.js';
+/** PDFs and CSVs are generated in the browser now, so downloads come from Blobs. */
+const saveCsv = (kind: string) =>
+  void import('./core/routes.js')
+    .then((m) => m.exportCsv(kind))
+    .then((b) => download(b, `horeca-${kind}.csv`));
+const savePdf = (kind: string, id: string, reference: string) =>
+  void import('./core/routes.js')
+    .then((m) => m.documentBlob(kind, id))
+    .then(({ blob }) => download(blob, `${reference}.pdf`));
 import { Badge, Empty, ErrorMessage, Loading, Logo, Modal } from './ui.js';
 import { Notifications, type LiveEvent } from './notifications.js';
 
@@ -803,9 +812,9 @@ function Workspace({
             </div>
             <div className="admin-title-actions">
               {!['overview', 'staff', 'settings'].includes(module) && (
-                <a className="button outline small" href={`/api/admin/${module}/export`}>
+                <button className="button outline small" onClick={() => saveCsv(module)}>
                   <ArrowDownToLine size={16} /> Export CSV
-                </a>
+                </button>
               )}
               {((editable && module !== 'settings') || module === 'quotes') && (
                 <button className="button green small" onClick={newRecord}>
@@ -900,13 +909,13 @@ function Workspace({
                           {module !== 'audit' && (
                             <td className="row-actions">
                               {module === 'invoices' ? (
-                                <a
+                                <button
                                   className="icon-button"
-                                  href={`/api/admin/invoices/${r.id}/pdf`}
+                                  onClick={() => savePdf('invoices', r.id, r.reference)}
                                   aria-label={`Download ${r.reference}`}
                                 >
                                   <ArrowDownToLine size={17} />
-                                </a>
+                                </button>
                               ) : (
                                 <button
                                   className="icon-button"
@@ -1751,9 +1760,12 @@ function Details({
       {kind === 'quotes' && (
         <>
           <div className="action-bar">
-            <a className="button outline small" href={`/api/admin/quotes/${r.id}/pdf`}>
+            <button
+              className="button outline small"
+              onClick={() => savePdf('quotes', r.id, r.reference)}
+            >
               <ArrowDownToLine size={16} /> Download PDF
-            </a>
+            </button>
             {r.status === 'Draft' && (
               <>
                 <button
@@ -1867,12 +1879,12 @@ function Details({
                   </button>
                 ) : (
                   <>
-                    <a
+                    <button
                       className="button outline small"
-                      href={`/api/admin/invoices/${r.invoiceId}/pdf`}
+                      onClick={() => savePdf('invoices', r.invoiceId, r.reference)}
                     >
                       Download invoice <ArrowDownToLine size={16} />
-                    </a>
+                    </button>
                     {r.paid < r.total && (
                       <button className="button green small" onClick={() => setAction('payment')}>
                         Record payment

@@ -1,0 +1,119 @@
+rules_version = '2';
+
+// Access control for Horeca Yard. With no application server, these rules are the
+// only enforcement of the role permissions described in README.md.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function staff() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active != false;
+    }
+    function role() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    function hasRole(allowed) {
+      return staff() && role() in allowed;
+    }
+    function owner()      { return hasRole(['Owner']); }
+    function commercial() { return hasRole(['Owner', 'Sales']); }
+    function warehouse()  { return hasRole(['Owner', 'Warehouse']); }
+    function anyStaff()   { return hasRole(['Owner', 'Sales', 'Warehouse']); }
+
+    // The public homepage reads only this document. Bank details, GSTIN and the
+    // registered address stay in /settings, which is Owner-only.
+    match /public/site {
+      allow read: if true;
+      allow write: if owner();
+    }
+
+    // Catalogue. Anonymous visitors may only see published/active rows, so their
+    // queries must carry that filter or the read is refused.
+    match /products/{id} {
+      allow read:  if resource.data.published == true || anyStaff();
+      allow write: if owner();
+    }
+    match /categories/{id} {
+      allow read:  if resource.data.active == true || anyStaff();
+      allow write: if owner();
+    }
+    match /brands/{id} {
+      allow read:  if resource.data.active == true || anyStaff();
+      allow write: if owner();
+    }
+
+    // Sales reads these to stamp the seller block onto quotations and invoices, and
+    // the warehouse reads the warehouse name. Only an Owner may change them.
+    match /settings/{id}  { allow read: if anyStaff(); allow write: if owner(); }
+    match /audit/{id}     { allow read: if owner();      allow create: if anyStaff(); }
+
+    // Staff directory. Every signed-in user reads it (assignment pickers need names);
+    // only an Owner may change roles or deactivate an account.
+    match /users/{uid} {
+      allow read:  if staff();
+      allow write: if owner();
+    }
+
+    match /customers/{id} { allow read, write: if commercial(); }
+    match /quotes/{id}    { allow read, write: if commercial(); }
+    match /invoices/{id}  { allow read, write: if commercial(); }
+
+    // Orders are visible to the warehouse, but only Owner/Warehouse move them along.
+    match /orders/{id} {
+      allow read:  if anyStaff();
+      allow write: if commercial() || warehouse();
+    }
+
+    // Sales reads stock for reports and reserves it when confirming an order, so
+    // both sides need access here even though only the warehouse edits stock in the UI.
+    match /batches/{id}   { allow read, write: if anyStaff(); }
+    match /movements/{id} { allow read, write: if anyStaff(); }
+
+    // Anonymous enquiries from the public site.
+    match /enquiries/{id} {
+      allow read, update, delete: if commercial();
+      allow create: if commercial()
+        || (request.resource.data.status == 'New'
+            && request.resource.data.assignedTo == ''
+            && request.resource.data.items.size() <= 100
+            && request.resource.data.name is string
+            && request.resource.data.phone is string
+            && request.resource.data.message.size() <= 3000);
+    }
+
+    // Reference numbers. An anonymous visitor may only take the next enquiry number
+    // or event sequence, one at a time; invoice and order series stay staff-only.
+    match /counters/{name} {
+      allow read: if true;
+      allow write: if anyStaff()
+        || ((name.matches('^E-.*') || name == '__events')
+            && request.resource.data.value == (resource == null ? 1 : resource.data.value + 1));
+    }
+
+    // Notification feed. An anonymous visitor may only announce a new enquiry, and
+    // cannot attribute it to a staff member or address it to another audience.
+    match /events/{id} {
+      allow read: if anyStaff();
+      allow create: if anyStaff()
+        || (request.resource.data.entity == 'enquiries'
+            && request.resource.data.actorId == null
+            && request.resource.data.audience == ['Owner', 'Sales']
+            && request.resource.data.message.matches('^New wholesale enquiry .*')
+            && request.resource.data.message.size() <= 300);
+      allow update, delete: if false;
+    }
+    match /notificationReads/{uid} {
+      allow read, write: if staff() && request.auth.uid == uid;
+    }
+
+    // Idempotency keys: write-once, never rewritten.
+    match /requestKeys/{key} {
+      allow read:   if true;
+      allow create: if true;
+      allow update, delete: if false;
+    }
+
+    match /{document=**} { allow read, write: if false; }
+  }
+}

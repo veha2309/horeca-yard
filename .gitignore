@@ -8,3 +8,6 @@ uploads/
 tmp/
 coverage/
 *.log
+
+# Firebase deploy cache
+.firebase/

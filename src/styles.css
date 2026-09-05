@@ -301,10 +301,6 @@ dd {
   gap: 14px;
   align-items: center;
 }
-.admin-link {
-  border-color: var(--border);
-  color: #7b8579;
-}
 .phone-pill {
   display: flex;
   align-items: center;
@@ -2623,9 +2619,6 @@ dd {
   .phone-pill {
     padding: 10px 13px;
     font-size: 11px;
-  }
-  .admin-link {
-    display: none;
   }
   .hero {
     padding-top: 40px;

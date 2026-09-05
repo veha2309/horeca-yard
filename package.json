@@ -13,7 +13,11 @@
     "password:local": "tsx server/password-local.ts",
     "stop": "node scripts/stop.mjs",
     "migrate": "tsx server/migrate.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "bootstrap": "tsx scripts/bootstrap-firestore.ts",
+    "deploy": "npm run build:web && firebase deploy",
+    "build:web": "tsc --noEmit && vite build",
+    "test:firestore": "FIREBASE_EMULATOR=1 tsx --test tests/firestore-workflow.test.mts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.900.0",
@@ -22,6 +26,7 @@
     "dotenv": "^16.6.1",
     "express": "^5.1.0",
     "express-rate-limit": "^8.1.0",
+    "firebase": "^12.18.0",
     "helmet": "^8.1.0",
     "lucide-react": "^0.468.0",
     "multer": "^2.0.2",

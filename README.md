@@ -1,28 +1,40 @@
 # Horeca Yard
 
-A complete wholesale catalogue and operations application, recreated from the supplied Emergent reference and Horeca Yard brand imagery. Built with React, TypeScript, Vite, Express and PostgreSQL. No paid services are needed to run the local preview.
+A complete wholesale catalogue and operations application, recreated from the supplied Emergent reference and Horeca Yard brand imagery. Built with React, TypeScript and Vite, running on Firebase Hosting with Cloud Firestore. No paid services are needed — it runs entirely on Firebase's free Spark plan.
 
-## Run locally
+## Live site
 
-Requires Node.js 22 or newer. Run commands from this project directory.
+Deployed to Firebase Hosting at **https://horecayard.web.app**, with Cloud Firestore as
+the database and Firebase Authentication for staff sign-in. The admin portal is
+**https://horecayard.web.app/admin/login**. See [FIREBASE.md](FIREBASE.md) for the
+architecture, deployment steps, and the permission trade-offs the serverless design
+forces.
 
 ```sh
 npm ci
-npm run setup:local
-npm run dev
+npm run deploy      # typecheck, build, deploy hosting + rules + indexes
 ```
 
-Open **http://localhost:3000**. The admin portal is **http://localhost:3000/admin/login**.
+Owner credentials from the initial setup are in `.data/firebase-access.txt`, which is
+excluded from Git and Docker. Change the password from **Staff & access** after signing
+in. Password recovery sends a real Firebase reset email.
 
-`setup:local` creates the owner with a random password and saves it to **.data/local-access.txt**, which is excluded from Git and Docker. It never reuses the reference site's password or overwrites an existing owner. Read that file locally, sign in, and change the password in **Staff & access**. The owner email is `admin@horecayard.com`.
+## Run against the emulators
 
-The local PostgreSQL engine (PGlite) persists in `.data/postgres`. It uses the same SQL schema as hosted PostgreSQL, but is a single-process development runtime. Do not run two apps against this directory, copy it while running, or force-kill the process. To stop it cleanly from another terminal:
+Requires Node.js 22 or newer and a JDK (for the Firestore emulator).
 
 ```sh
-npm run stop
+npm ci
+firebase emulators:start --only firestore,auth
+npm run test:firestore
 ```
 
-Use standard PostgreSQL for production. Do not point `DATABASE_URL` at a real business database for tests.
+## The original PostgreSQL server
+
+`server/` still contains the Express + PostgreSQL application this was ported from. It is
+no longer what gets deployed, and the browser no longer talks to it, but it remains
+runnable (`npm run setup:local && npm run dev`) as the reference for the business rules.
+`src/core/domain.ts` is a copy of `server/domain.ts` and should be kept in step with it.
 
 ## What is included
 
@@ -51,7 +63,11 @@ Use standard PostgreSQL for production. Do not point `DATABASE_URL` at a real bu
 | Commercial reports                         | Yes   | Yes   | No                 |
 | Staff / settings / audit                   | Yes   | No    | No                 |
 
-The server enforces these restrictions for all endpoints, including exports and mutation responses. Hiding a button is never the access-control mechanism.
+`firestore.rules` enforces these restrictions, since there is no longer a server. Hiding
+a button is never the access-control mechanism. Two rows are weaker than they look now:
+the Warehouse role can reach order prices through the SDK even though the UI hides them,
+and Sales can write stock batches because confirming an order reserves stock. Both are
+explained in [FIREBASE.md](FIREBASE.md).
 
 ## First business setup
 
